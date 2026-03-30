@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+.installed.cfg
+
+# Virtual Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Secrets & Credentials - NEVER commit these
+*.env
+.env.*
+secrets/
+credentials/
+*.pem
+*.key
+config/local_*.yml
+
+# Snowflake
+*.snowsql
+
+# Terraform
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/*.tfvars
+infrastructure/terraform/.terraform.lock.hcl
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Data files - never commit raw data
+data/sample/*.csv
+data/sample/*.json
+data/sample/*.parquet
+*.csv
+*.parquet
