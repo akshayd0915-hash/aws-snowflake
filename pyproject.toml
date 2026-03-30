@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "banking-data-platform"
+version = "0.1.0"
+description = "Enterprise-grade banking data platform on AWS and Snowflake"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.34.0",
+    "snowflake-connector-python>=3.6.0",
+    "snowflake-sqlalchemy>=1.5.0",
+    "apache-airflow>=2.8.0",
+    "great-expectations>=0.18.0",
+    "pandas>=2.1.0",
+    "pyarrow>=14.0.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+    "tenacity>=8.2.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ingestion*", "transformation*", "data_quality*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--cov=ingestion --cov=transformation --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+select = ["E", "F", "I", "N", "W"]
+
+[tool.ruff.per-file-ignores]
+"tests/*" = ["S101"]
