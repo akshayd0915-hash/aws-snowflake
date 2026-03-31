@@ -11,7 +11,7 @@ import uuid
 import random
 import json
 import csv
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from ingestion.scripts.logger import get_logger
@@ -134,8 +134,8 @@ def generate_customers(n: int = 500) -> list[dict]:
                 weights=[85, 10, 5]
             )[0],
             "credit_score": random.randint(580, 850),
-            "created_at": str(datetime.utcnow()),
-            "updated_at": str(datetime.utcnow()),
+            "created_at": str(datetime.now(timezone.utc)),
+            "updated_at": str(datetime.now(timezone.utc)),
         }
         # Set email after name is generated
         customer["email"] = (
@@ -185,8 +185,8 @@ def generate_accounts(customers: list[dict]) -> list[dict]:
                 "opened_date": str(random_date(2010, 2023)),
                 "status": "ACTIVE" if customer["status"] == "ACTIVE" else "INACTIVE",
                 "branch_code": random.choice(BRANCH_CODES),
-                "created_at": str(datetime.utcnow()),
-                "updated_at": str(datetime.utcnow()),
+                "created_at": str(datetime.now(timezone.utc)),
+                "updated_at": str(datetime.now(timezone.utc)),
             }
             accounts.append(account)
 
@@ -246,7 +246,7 @@ def generate_transactions(accounts: list[dict], n_per_account: int = 20) -> list
                 "transaction_date": str(txn_date),
                 "value_date": str(txn_date.date()),
                 "reference_number": generate_reference_number(),
-                "created_at": str(datetime.utcnow()),
+                "created_at": str(datetime.now(timezone.utc)),
             }
             transactions.append(transaction)
 
@@ -293,10 +293,10 @@ def generate_fraud_flags(transactions: list[dict]) -> list[dict]:
             "is_confirmed_fraud": random.choices(
                 [True, False], weights=[10, 90]
             )[0],
-            "flagged_at": str(datetime.utcnow()),
+            "flagged_at": str(datetime.now(timezone.utc)),
             "reviewed_at": None,
             "reviewed_by": None,
-            "created_at": str(datetime.utcnow()),
+            "created_at": str(datetime.now(timezone.utc)),
         }
         flags.append(flag)
 
