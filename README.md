@@ -3,13 +3,11 @@
 An enterprise-grade data engineering platform built on AWS, Snowflake, and Apache Airflow — implementing a full Medallion Architecture (Bronze → Silver → Gold) for banking analytics.
 
 ## 📐 Architecture Overview
-```
 ![Architecture Diagram](docs/diagrams/architecture.svg)
 
 > **Key principle:** Raw data lands in S3 (Bronze), flows through Snowflake Silver
 > for cleaning and validation, and into Gold star schema for analytics — with full
 > data lineage, audit trail, and regulatory compliance at every layer.
-```
 
 ## 🛠️ Tech Stack
 
