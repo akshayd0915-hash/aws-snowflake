@@ -1,0 +1,172 @@
+# ============================================================
+# Deploy Pipeline Workflow
+# Runs on push to master branch
+# Deploys DAGs and runs integration checks
+# ============================================================
+
+name: Deploy Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'development' }}
+
+jobs:
+  deploy-dags:
+    name: Deploy Airflow DAGs
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'development' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install boto3 apache-airflow==2.8.1 \
+            --constraint \
+            "https://raw.githubusercontent.com/apache/airflow/constraints-2.8.1/constraints-3.12.txt"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            us-east-1
+
+      - name: Validate DAG syntax
+        run: |
+          python -c "
+          import ast
+          from pathlib import Path
+          for f in Path('orchestration/dags').glob('*.py'):
+              ast.parse(f.read_text())
+              print(f'Valid: {f.name}')
+          "
+
+      - name: Upload DAGs to S3 (MWAA)
+        run: |
+          aws s3 sync orchestration/dags/ \
+            s3://banking-data-platform-raw-akshay/dags/ \
+            --exclude "__pycache__/*" \
+            --exclude "*.pyc"
+          echo "DAGs uploaded to S3"
+
+      - name: Upload plugins to S3 (MWAA)
+        run: |
+          aws s3 sync orchestration/plugins/ \
+            s3://banking-data-platform-raw-akshay/plugins/ \
+            --exclude "__pycache__/*"
+          echo "Plugins uploaded to S3"
+
+      - name: Notify deployment success
+        run: |
+          echo "Deployment Summary"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Deployed by: ${{ github.actor }}"
+
+  validate-snowflake-objects:
+    name: Validate Snowflake Objects
+    runs-on: ubuntu-latest
+    needs: deploy-dags
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Snowflake connector
+        run: pip install snowflake-connector-python
+
+      - name: Validate Snowflake tables exist
+        run: |
+          python -c "
+          import snowflake.connector
+          import os
+
+          conn = snowflake.connector.connect(
+              account   = os.environ['SNOWFLAKE_ACCOUNT'],
+              user      = os.environ['SNOWFLAKE_USER'],
+              password  = os.environ['SNOWFLAKE_PASSWORD'],
+              role      = 'ACCOUNTADMIN',
+              warehouse = 'BANKING_WH',
+              database  = 'BANKING_DB',
+          )
+
+          required_tables = [
+              ('RAW',    'RAW_CUSTOMERS'),
+              ('RAW',    'RAW_TRANSACTIONS'),
+              ('SILVER', 'SILVER_CUSTOMERS'),
+              ('SILVER', 'SILVER_TRANSACTIONS'),
+              ('GOLD',   'DIM_CUSTOMERS'),
+              ('GOLD',   'FACT_TRANSACTIONS'),
+          ]
+
+          cursor = conn.cursor()
+          missing = []
+          for schema, table in required_tables:
+              cursor.execute(f'''
+                  SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+                  WHERE TABLE_SCHEMA = '{schema}'
+                  AND TABLE_NAME = '{table}'
+              ''')
+              count = cursor.fetchone()[0]
+              if count == 0:
+                  missing.append(f'{schema}.{table}')
+              else:
+                  print(f'OK: {schema}.{table}')
+
+          if missing:
+              raise Exception(f'Missing tables: {missing}')
+
+          print('All Snowflake objects validated')
+          conn.close()
+          "
+        env:
+          SNOWFLAKE_ACCOUNT:  ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:     ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+
+  create-release:
+    name: Create Release Tag
+    runs-on: ubuntu-latest
+    needs: validate-snowflake-objects
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create release tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          TAG="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
+          git tag $TAG
+          git push origin $TAG
+          echo "Released: $TAG"

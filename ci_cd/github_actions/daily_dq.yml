@@ -1,0 +1,66 @@
+# ============================================================
+# Daily Data Quality Check Workflow
+# Runs every day at 6 AM UTC
+# Validates Silver and Gold layer data quality
+# ============================================================
+
+name: Daily Data Quality Check
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # 6 AM UTC daily
+  workflow_dispatch:         # Allow manual trigger
+
+jobs:
+  run-dq-checks:
+    name: Run Data Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install snowflake-connector-python loguru tenacity \
+            pydantic pydantic-settings python-dotenv
+
+      - name: Create env file
+        run: |
+          cat > configs/environments/dev.env << EOF
+          SNOWFLAKE_ACCOUNT=${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER=${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD=${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE=ACCOUNTADMIN
+          SNOWFLAKE_WAREHOUSE=BANKING_WH
+          SNOWFLAKE_DATABASE=BANKING_DB
+          AWS_S3_BUCKET=banking-data-platform-raw-akshay
+          AWS_S3_PROCESSED_BUCKET=banking-data-platform-processed-akshay
+          EOF
+
+      - name: Run DQ checks
+        run: |
+          python data_quality/expectations/dq_checks.py
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Upload DQ reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dq-reports-${{ github.run_id }}
+          path: logs/dq_report_*.json
+          retention-days: 30
+
+      - name: Check for failures
+        if: failure()
+        run: |
+          echo "DQ checks failed! Check artifacts for details."
+          exit 1
