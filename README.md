@@ -4,7 +4,11 @@ An enterprise-grade data engineering platform built on AWS, Snowflake, and Apach
 
 ## 📐 Architecture Overview
 ```
-Source Systems → S3 (Bronze) → Snowflake Silver → Snowflake Gold → Analytics
+![Architecture Diagram](docs/diagrams/architecture.svg)
+
+> **Key principle:** Raw data lands in S3 (Bronze), flows through Snowflake Silver
+> for cleaning and validation, and into Gold star schema for analytics — with full
+> data lineage, audit trail, and regulatory compliance at every layer.
 ```
 
 ## 🛠️ Tech Stack
