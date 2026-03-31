@@ -9,7 +9,6 @@ SLA: 1 hour
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
-from airflow.utils.dates import days_ago
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
@@ -18,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))
 
 from orchestration.dags.dag_config import (
     DEFAULT_ARGS, S3_RAW_BUCKET,
-    TAGS_INGESTION, BRONZE_SLA
+    TAGS_INGESTION
 )
 from ingestion.scripts.s3_uploader import S3Uploader
 from ingestion.scripts.logger import PipelineLogger
@@ -28,11 +27,10 @@ with DAG(
     dag_id="banking_01_ingestion",
     description="Upload raw banking data to S3 Bronze layer",
     default_args=DEFAULT_ARGS,
-    schedule="0 0 * * *",          # Daily at midnight
+    schedule="0 0 * * *",
     catchup=False,
-    max_active_runs=1,              # Prevent concurrent runs
+    max_active_runs=1,
     tags=TAGS_INGESTION,
-    sla_miss_callback=None,
     doc_md="""
     ## Banking Ingestion DAG
     Uploads raw CSV files to S3 with Hive-style partitioning.
@@ -83,7 +81,6 @@ with DAG(
                 entity=entity,
                 partition_date=datetime.now(timezone.utc),
             )
-            # Push result to XCom for downstream tasks
             context["ti"].xcom_push(
                 key=f"{entity}_s3_key",
                 value=result["s3_key"]
@@ -120,58 +117,45 @@ with DAG(
 
     # ── Tasks ─────────────────────────────────────────────────
 
-    start = EmptyOperator(
-        task_id="start",
-        dag=dag,
-    )
+    start = EmptyOperator(task_id="start")
 
     validate = PythonOperator(
         task_id="validate_source_files",
         python_callable=validate_source_files,
-        dag=dag,
     )
 
     upload_customers = PythonOperator(
         task_id="upload_customers",
         python_callable=upload_entity,
         op_kwargs={"entity": "customers"},
-        dag=dag,
     )
 
     upload_accounts = PythonOperator(
         task_id="upload_accounts",
         python_callable=upload_entity,
         op_kwargs={"entity": "accounts"},
-        dag=dag,
     )
 
     upload_transactions = PythonOperator(
         task_id="upload_transactions",
         python_callable=upload_entity,
         op_kwargs={"entity": "transactions"},
-        dag=dag,
     )
 
     upload_fraud_flags = PythonOperator(
         task_id="upload_fraud_flags",
         python_callable=upload_entity,
         op_kwargs={"entity": "fraud_flags"},
-        dag=dag,
     )
 
     verify = PythonOperator(
         task_id="verify_uploads",
         python_callable=verify_uploads,
-        dag=dag,
     )
 
-    end = EmptyOperator(
-        task_id="end",
-        dag=dag,
-    )
+    end = EmptyOperator(task_id="end")
 
     # ── Task Dependencies ─────────────────────────────────────
-    # start → validate → upload all 4 files (parallel) → verify → end
     start >> validate
     validate >> [
         upload_customers,
