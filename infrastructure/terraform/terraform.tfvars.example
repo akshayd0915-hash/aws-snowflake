@@ -1,0 +1,16 @@
+# ============================================================
+# Banking Data Platform — Terraform Variable Values
+# Copy to terraform.tfvars and fill in real values
+# NEVER commit terraform.tfvars — it is gitignored
+# ============================================================
+
+aws_region               = "us-east-1"
+environment              = "development"
+project_name             = "banking-data-platform"
+owner_name               = "akshay"
+snowflake_account_id     = "490333984697"
+snowflake_external_id    = "your_external_id_here"
+s3_raw_bucket_name       = "banking-data-platform-raw-akshay"
+s3_processed_bucket_name = "banking-data-platform-processed-akshay"
+log_retention_days       = 30
+s3_raw_retention_days    = 2555
